@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carregando...</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <header>
+        <div class="logo">Notícias</div>
+        <nav class="main-menu">
+            <ul>
+                <li><a href="index.html">Home</a></li>
+                <li><a href="categoria.html?categoria=Política">Política</a></li>
+                <li><a href="categoria.html?categoria=Esportes">Esportes</a></li>
+                <li><a href="categoria.html?categoria=Entretenimento">Entretenimento</a></li>
+                <li><a href="categoria.html?categoria=Variedades">Variedades</a></li>
+                <li><a href="categoria.html?categoria=Mundo">Mundo</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <div class="container" id="article-container" style="max-width: 900px;">
+        <div class="loading-message">Carregando notícia...</div>
+    </div>
+
+    <script src="db_noticias.js"></script>
+    <script>
+        function formatarData(dataStr) {
+            return new Date(dataStr).toLocaleDateString('pt-BR', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+        }
+        
+        async function loadSingleNews() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const noticiaId = urlParams.get('id');
+            const container = document.getElementById('article-container');
+
+            if (!noticiaId) {
+                container.innerHTML = "<h1 class='error-message'>Erro: ID da notícia não encontrado.</h1>";
+                return;
+            }
+
+            const todasNoticias = await getMockNoticias();
+            const noticia = todasNoticias.find(n => n.id == noticiaId);
+
+            if (!noticia) {
+                container.innerHTML = "<h1 class='error-message'>Erro: Notícia não encontrada.</h1>";
+                return;
+            }
+
+            document.title = noticia.titulo;
+
+            const imgNoticia = `img/${noticia.imagem || 'no-image.jpg'}`;
+            container.innerHTML = `
+                <article>
+                    <header class="article-header">
+                        <h1>${noticia.titulo}</h1>
+                        <div class="article-meta">
+                            <span class="category">${noticia.categoria}</span>
+                            <span>Por <strong>${noticia.quem_postou}</strong></span>
+                            <span>Em ${formatarData(noticia.data_postagem)}</span>
+                        </div>
+                    </header>
+
+                    <img src="${imgNoticia}" alt="${noticia.titulo}" class="article-image">
+
+                    <div class="article-content">
+                        ${noticia.noticia}
+                    </div>
+                </article>
+            `;
+        }
+
+        document.addEventListener('DOMContentLoaded', loadSingleNews);
+    </script>
+</body>
+</html>
