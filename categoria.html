@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Portal de Notícias</title> 
+    
+    <base href="http://localhost:8080/News-Front/">
+    
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -39,9 +42,9 @@
 
     </div>
 
-    <script src="db_noticias.js"></script>
     <script>
         function formatarData(dataStr) {
+            if (!dataStr) return "";
             return new Date(dataStr).toLocaleDateString('pt-BR', {
                 day: '2-digit',
                 month: '2-digit',
@@ -49,117 +52,132 @@
             });
         }
 
+        // Função para tratar caminhos de imagem
+        const montarImagem = (nomeArquivo) => {
+            if (!nomeArquivo || nomeArquivo === "") return 'img/no-image.jpg';
+            if (nomeArquivo.startsWith('http')) return nomeArquivo;
+            if (nomeArquivo.startsWith('img/')) return nomeArquivo; // Graças a tag <base>, não duplicamos o caminho
+            return `img/${nomeArquivo}`;
+        };
+
         async function loadCategoryNews() {
             const featuredContainer = document.getElementById('featured-news');
             const secondaryContainer = document.getElementById('secondary-news-wrapper');
             const sidebarList = document.getElementById('all-news-list');
+            const categoryTitle = document.getElementById('category-title');
             
             const urlParams = new URLSearchParams(window.location.search);
             const categoryName = urlParams.get('categoria');
 
             if (!categoryName) {
-                document.getElementById('category-title').textContent = "Erro: Categoria não encontrada";
+                categoryTitle.textContent = "Erro: Categoria não encontrada na URL";
                 return;
             }
 
+            // Configurações visuais iniciais
             document.title = `Categoria: ${categoryName}`;
-            document.getElementById('category-title').textContent = categoryName;
+            categoryTitle.textContent = categoryName;
             document.getElementById('sidebar-title').textContent = `Mais de ${categoryName}`;
             const activeLink = document.getElementById(`nav-${categoryName}`);
-            if (activeLink) {
-                activeLink.classList.add('active');
-            }
+            if (activeLink) activeLink.classList.add('active');
 
-            const todasNoticias = await getMockNoticias();
-            const noticiasFiltradas = todasNoticias.filter(noticia => noticia.categoria === categoryName);
+            try {
+                // --- REQUISIÇÃO API ---
+                const response = await fetch('http://localhost:8080/API-News/api.php/noticias/');
+                if(!response.ok) throw new Error("Erro na API");
+                
+                const todasNoticias = await response.json();
 
-            featuredContainer.innerHTML = "";
-            secondaryContainer.innerHTML = "";
-            sidebarList.innerHTML = "";
+                // 1. Filtrar pela categoria
+                const noticiasFiltradas = todasNoticias.filter(noticia => noticia.categoria === categoryName);
 
-            if (noticiasFiltradas.length === 0) {
-                featuredContainer.innerHTML = "<p class='loading-message'>Nenhuma notícia encontrada nesta categoria.</p>";
-                return;
-            }
+                // 2. Ordenar por data (mais recente primeiro)
+                noticiasFiltradas.sort((a, b) => new Date(b.data_postagem) - new Date(a.data_postagem));
 
-            const noticiaDestaque = noticiasFiltradas.shift();
-            const noticiaSecundaria1 = noticiasFiltradas.shift();
-            const noticiaSecundaria2 = noticiasFiltradas.shift();
-            const outrasNoticias = noticiasFiltradas;
+                // Limpar containers
+                featuredContainer.innerHTML = "";
+                secondaryContainer.innerHTML = "";
+                sidebarList.innerHTML = "";
 
-            if (noticiaDestaque) {
-                const imgDestaque = `img/${noticiaDestaque.imagem || 'no-image.jpg'}`;
-                featuredContainer.innerHTML = `
-                    <article class="card card-large">
-                        <a href="noticia.html?id=${noticiaDestaque.id}">
-                            <img src="${imgDestaque}" alt="${noticiaDestaque.titulo}">
-                            <span class="category-badge">${noticiaDestaque.categoria}</span>
-                        </a>
-                        <div class="card-content">
-                            <h2><a href="noticia.html?id=${noticiaDestaque.id}">${noticiaDestaque.titulo}</a></h2>
-                            <div class="meta-info">
-                                <span>Por ${noticiaDestaque.quem_postou}</span>
-                                <span>${formatarData(noticiaDestaque.data_postagem)}</span>
-                            </div>
-                        </div>
-                    </article>
-                `;
-            }
+                if (noticiasFiltradas.length === 0) {
+                    featuredContainer.innerHTML = "<p class='loading-message'>Nenhuma notícia encontrada nesta categoria.</p>";
+                    sidebarList.innerHTML = "";
+                    return;
+                }
 
-            if (noticiaSecundaria1) {
-                const imgSec1 = `img/${noticiaSecundaria1.imagem || 'no-image.jpg'}`;
-                secondaryContainer.innerHTML += `
-                    <article class="card card-medium">
-                        <a href="noticia.html?id=${noticiaSecundaria1.id}">
-                            <img src="${imgSec1}" alt="${noticiaSecundaria1.titulo}">
-                            <span class="category-badge">${noticiaSecundaria1.categoria}</span>
-                        </a>
-                        <div class="card-content">
-                            <h3><a href="noticia.html?id=${noticiaSecundaria1.id}">${noticiaSecundaria1.titulo}</a></h3>
-                            <div class="meta-info">
-                                <span>${formatarData(noticiaSecundaria1.data_postagem)}</span>
-                            </div>
-                        </div>
-                    </article>
-                `;
-            }
-            if (noticiaSecundaria2) {
-                const imgSec2 = `img/${noticiaSecundaria2.imagem || 'no-image.jpg'}`;
-                secondaryContainer.innerHTML += `
-                    <article class="card card-medium">
-                        <a href="noticia.html?id=${noticiaSecundaria2.id}">
-                            <img src="${imgSec2}" alt="${noticiaSecundaria2.titulo}">
-                            <span class="category-badge">${noticiaSecundaria2.categoria}</span>
-                        </a>
-                        <div class="card-content">
-                            <h3><a href="noticia.html?id=${noticiaSecundaria2.id}">${noticiaSecundaria2.titulo}</a></h3>
-                            <div class="meta-info">
-                                <span>${formatarData(noticiaSecundaria2.data_postagem)}</span>
-                            </div>
-                        </div>
-                    </article>
-                `;
-            }
+                // --- DISTRIBUIÇÃO ---
+                const noticiaDestaque = noticiasFiltradas.shift();
+                const noticiaSecundaria1 = noticiasFiltradas.shift();
+                const noticiaSecundaria2 = noticiasFiltradas.shift();
+                const outrasNoticias = noticiasFiltradas;
 
-            if (outrasNoticias.length > 0) {
-                outrasNoticias.forEach(noticia => {
-                    const imgItem = `img/${noticia.imagem || 'no-image.jpg'}`;
-                    sidebarList.innerHTML += `
-                        <article class="sidebar-item">
-                            <a href="noticia.html?id=${noticia.id}">
-                                <img src="${imgItem}" alt="${noticia.titulo}">
+                // Renderizar Destaque
+                if (noticiaDestaque) {
+                    const imgDestaque = montarImagem(noticiaDestaque.imagem);
+                    featuredContainer.innerHTML = `
+                        <article class="card card-large">
+                            <a href="noticia.html?id=${noticiaDestaque.id}">
+                                <img src="${imgDestaque}" alt="${noticiaDestaque.titulo}">
+                                <span class="category-badge">${noticiaDestaque.categoria}</span>
                             </a>
-                            <div class="sidebar-content">
-                                <h4><a href="noticia.html?id=${noticia.id}">${noticia.titulo}</a></h4>
+                            <div class="card-content">
+                                <h2><a href="noticia.html?id=${noticiaDestaque.id}">${noticiaDestaque.titulo}</a></h2>
+                                <div class="meta-info">
+                                    <span>Por ${noticiaDestaque.quem_postou}</span>
+                                    <span>${formatarData(noticiaDestaque.data_postagem)}</span>
+                                </div>
+                            </div>
+                        </article>
+                    `;
+                }
+
+                // Renderizar Secundárias
+                const renderSecundaria = (noticia) => {
+                    const imgSec = montarImagem(noticia.imagem);
+                    secondaryContainer.innerHTML += `
+                        <article class="card card-medium">
+                            <a href="noticia.html?id=${noticia.id}">
+                                <img src="${imgSec}" alt="${noticia.titulo}">
+                                <span class="category-badge">${noticia.categoria}</span>
+                            </a>
+                            <div class="card-content">
+                                <h3><a href="noticia.html?id=${noticia.id}">${noticia.titulo}</a></h3>
                                 <div class="meta-info">
                                     <span>${formatarData(noticia.data_postagem)}</span>
                                 </div>
                             </div>
                         </article>
                     `;
-                });
-            } else {
-                sidebarList.innerHTML = "<p class='loading-message'>Não há mais notícias.</p>";
+                };
+
+                if (noticiaSecundaria1) renderSecundaria(noticiaSecundaria1);
+                if (noticiaSecundaria2) renderSecundaria(noticiaSecundaria2);
+
+                // Renderizar Sidebar
+                if (outrasNoticias.length > 0) {
+                    outrasNoticias.forEach(noticia => {
+                        const imgItem = montarImagem(noticia.imagem);
+                        sidebarList.innerHTML += `
+                            <article class="sidebar-item">
+                                <a href="noticia.html?id=${noticia.id}">
+                                    <img src="${imgItem}" alt="${noticia.titulo}">
+                                </a>
+                                <div class="sidebar-content">
+                                    <h4><a href="noticia.html?id=${noticia.id}">${noticia.titulo}</a></h4>
+                                    <div class="meta-info">
+                                        <span>${formatarData(noticia.data_postagem)}</span>
+                                    </div>
+                                </div>
+                            </article>
+                        `;
+                    });
+                } else {
+                    sidebarList.innerHTML = "<p class='loading-message'>Não há mais notícias.</p>";
+                }
+
+            } catch (e) {
+                console.error(e);
+                featuredContainer.innerHTML = "<p style='color:red'>Erro ao conectar com o servidor.</p>";
             }
         }
 

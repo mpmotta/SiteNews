@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Carregando...</title>
+    
+    <base href="http://localhost:8080/News-Front/">
+    
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -26,15 +29,22 @@
         <div class="loading-message">Carregando notícia...</div>
     </div>
 
-    <script src="db_noticias.js"></script>
     <script>
         function formatarData(dataStr) {
+            if(!dataStr) return "";
             return new Date(dataStr).toLocaleDateString('pt-BR', {
                 day: '2-digit',
                 month: '2-digit',
                 year: 'numeric'
             });
         }
+
+        const montarImagem = (nomeArquivo) => {
+            if (!nomeArquivo || nomeArquivo === "") return 'img/no-image.jpg';
+            if (nomeArquivo.startsWith('http')) return nomeArquivo;
+            if (nomeArquivo.startsWith('img/')) return nomeArquivo;
+            return `img/${nomeArquivo}`;
+        };
         
         async function loadSingleNews() {
             const urlParams = new URLSearchParams(window.location.search);
@@ -42,39 +52,57 @@
             const container = document.getElementById('article-container');
 
             if (!noticiaId) {
-                container.innerHTML = "<h1 class='error-message'>Erro: ID da notícia não encontrado.</h1>";
+                container.innerHTML = "<h1 class='error-message'>Erro: ID da notícia não encontrado na URL.</h1>";
                 return;
             }
 
-            const todasNoticias = await getMockNoticias();
-            const noticia = todasNoticias.find(n => n.id == noticiaId);
+            try {
+                // --- REQUISIÇÃO API ---
+                // Buscamos todas para garantir compatibilidade e filtramos no JS
+                const response = await fetch('http://localhost:8080/API-News/api.php/noticias/');
+                if(!response.ok) throw new Error("Erro na API");
 
-            if (!noticia) {
-                container.innerHTML = "<h1 class='error-message'>Erro: Notícia não encontrada.</h1>";
-                return;
-            }
+                const todasNoticias = await response.json();
+                
+                // Encontrar a notícia específica (converte ID para string na comparação)
+                const noticia = todasNoticias.find(n => n.id == noticiaId);
 
-            document.title = noticia.titulo;
+                if (!noticia) {
+                    container.innerHTML = "<h1 class='error-message'>Erro: Notícia não encontrada no banco de dados.</h1>";
+                    document.title = "Notícia não encontrada";
+                    return;
+                }
 
-            const imgNoticia = `img/${noticia.imagem || 'no-image.jpg'}`;
-            container.innerHTML = `
-                <article>
-                    <header class="article-header">
-                        <h1>${noticia.titulo}</h1>
-                        <div class="article-meta">
-                            <span class="category">${noticia.categoria}</span>
-                            <span>Por <strong>${noticia.quem_postou}</strong></span>
-                            <span>Em ${formatarData(noticia.data_postagem)}</span>
+                document.title = noticia.titulo;
+
+                const imgNoticia = montarImagem(noticia.imagem);
+                
+                // Converte quebras de linha \n do banco para <br> no HTML
+                const textoFormatado = noticia.noticia.replace(/\n/g, '<br>');
+
+                container.innerHTML = `
+                    <article>
+                        <header class="article-header">
+                            <h1>${noticia.titulo}</h1>
+                            <div class="article-meta">
+                                <span class="category">${noticia.categoria}</span>
+                                <span>Por <strong>${noticia.quem_postou}</strong></span>
+                                <span>Em ${formatarData(noticia.data_postagem)}</span>
+                            </div>
+                        </header>
+
+                        <img src="${imgNoticia}" alt="${noticia.titulo}" class="article-image" onerror="this.src='img/no-image.jpg'">
+
+                        <div class="article-content">
+                            ${textoFormatado}
                         </div>
-                    </header>
+                    </article>
+                `;
 
-                    <img src="${imgNoticia}" alt="${noticia.titulo}" class="article-image">
-
-                    <div class="article-content">
-                        ${noticia.noticia}
-                    </div>
-                </article>
-            `;
+            } catch (e) {
+                console.error(e);
+                container.innerHTML = "<h1 class='error-message'>Erro ao carregar a notícia. Tente novamente.</h1>";
+            }
         }
 
         document.addEventListener('DOMContentLoaded', loadSingleNews);
